@@ -5,9 +5,11 @@ const { Server } = require("socket.io");
 const ACTIONS = require("./Actions").default;
 const cors = require("cors");
 const axios = require("axios");
-const server = http.createServer(app);
 require("dotenv").config();
 
+const server = http.createServer(app);
+
+// Language configurations for jdoodle API
 const languageConfig = {
   python3: { versionIndex: "3" },
   java: { versionIndex: "3" },
@@ -33,6 +35,7 @@ app.use(cors());
 // Parse JSON bodies
 app.use(express.json());
 
+// Setup socket.io
 const io = new Server(server, {
   cors: {
     origin: "http://localhost:3001",
@@ -41,6 +44,7 @@ const io = new Server(server, {
 });
 
 const userSocketMap = {};
+
 const getAllConnectedClients = (roomId) => {
   return Array.from(io.sockets.adapter.rooms.get(roomId) || []).map(
     (socketId) => {
@@ -52,13 +56,14 @@ const getAllConnectedClients = (roomId) => {
   );
 };
 
+// Socket.io connection
 io.on("connection", (socket) => {
-  // console.log('Socket connected', socket.id);
   socket.on(ACTIONS.JOIN, ({ roomId, username }) => {
     userSocketMap[socket.id] = username;
     socket.join(roomId);
     const clients = getAllConnectedClients(roomId);
-    // notify that new user join
+
+    // Notify that a new user has joined
     clients.forEach(({ socketId }) => {
       io.to(socketId).emit(ACTIONS.JOINED, {
         clients,
@@ -68,19 +73,19 @@ io.on("connection", (socket) => {
     });
   });
 
-  // sync the code
+  // Sync the code
   socket.on(ACTIONS.CODE_CHANGE, ({ roomId, code }) => {
     socket.in(roomId).emit(ACTIONS.CODE_CHANGE, { code });
   });
-  // when new user join the room all the code which are there are also shows on that persons editor
+
+  // Sync existing code when a new user joins
   socket.on(ACTIONS.SYNC_CODE, ({ socketId, code }) => {
     io.to(socketId).emit(ACTIONS.CODE_CHANGE, { code });
   });
 
-  // leave room
+  // Handle disconnection
   socket.on("disconnecting", () => {
     const rooms = [...socket.rooms];
-    // leave all the room
     rooms.forEach((roomId) => {
       socket.in(roomId).emit(ACTIONS.DISCONNECTED, {
         socketId: socket.id,
@@ -93,6 +98,7 @@ io.on("connection", (socket) => {
   });
 });
 
+// Compilation endpoint
 app.post("/compile", async (req, res) => {
   const { code, language } = req.body;
 
@@ -107,10 +113,67 @@ app.post("/compile", async (req, res) => {
 
     res.json(response.data);
   } catch (error) {
-    console.error(error);
+    console.error("Compilation error:", error);
     res.status(500).json({ error: "Failed to compile code" });
   }
 });
+
+// AI suggestions endpoint
+// AI suggestions endpoint
+app.post("/suggest", async (req, res) => {
+  const code = req.body.code;
+
+  console.log("Received code:", code); // Log received code
+
+  if (!code) {
+    return res.status(400).json({ error: "Code is required" });
+  }
+
+  try {
+    const suggestions = await getSuggestionsFromAI(code);
+    console.log("Generated suggestions:", suggestions); // Log generated suggestions
+    res.json({ suggestions });
+  } catch (error) {
+    console.error("Error fetching AI suggestions:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch AI suggestions" });
+  }
+});
+async function getSuggestionsFromAI(code) {
+  try {
+    console.log("Sending code to OpenAI:", code); // Log the code being sent
+    
+    const response = await axios.post("https://api.openai.com/v1/chat/completions", {
+      model: "gpt-3.5-turbo",
+      messages: [
+        {
+          role: "user",
+          content: `Based on the following code, provide suggestions for improvement or fixes:\n\n${code}`,
+        },
+      ],
+      max_tokens: 150,
+      temperature: 0.7,
+    }, {
+      headers: {
+        "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`, // Ensure the correct environment variable is used
+        "Content-Type": "application/json",
+      },
+    });
+
+    // Check if the response contains choices
+    if (response.data.choices && response.data.choices.length > 0) {
+      const suggestions = response.data.choices[0].message.content.split("\n").filter(Boolean);
+      return suggestions; // Return suggestions if available
+    } else {
+      console.error("No suggestions received from OpenAI.");
+      return []; // Return an empty array if no suggestions found
+    }
+  } catch (error) {
+    // Log detailed error information
+    console.error("Error calling OpenAI API:", error.response ? error.response.data : error.message);
+    throw new Error("Failed to fetch AI suggestions");
+  }
+}
+
 
 const PORT = process.env.PORT || 4000;
 server.listen(PORT, () => console.log(`Server is running on port ${PORT}`));

@@ -1,0 +1,20 @@
+{
+  "dev": {
+    "awscloudformation": {
+      "AuthRoleName": "amplify-colabcoding-dev-b7ce8-authRole",
+      "UnauthRoleArn": "arn:aws:iam::010526238559:role/amplify-colabcoding-dev-b7ce8-unauthRole",
+      "AuthRoleArn": "arn:aws:iam::010526238559:role/amplify-colabcoding-dev-b7ce8-authRole",
+      "Region": "ap-south-1",
+      "DeploymentBucketName": "amplify-colabcoding-dev-b7ce8-deployment",
+      "UnauthRoleName": "amplify-colabcoding-dev-b7ce8-unauthRole",
+      "StackName": "amplify-colabcoding-dev-b7ce8",
+      "StackId": "arn:aws:cloudformation:ap-south-1:010526238559:stack/amplify-colabcoding-dev-b7ce8/4aded2a0-8231-11ef-a3cb-069e2eb08c69",
+      "AmplifyAppId": "d2p2bwi92r8tga"
+    },
+    "categories": {
+      "api": {
+        "colabcoding": {}
+      }
+    }
+  }
+}

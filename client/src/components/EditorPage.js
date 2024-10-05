@@ -3,12 +3,7 @@ import Client from "./Client";
 import Editor from "./Editor";
 import { initSocket } from "../Socket";
 import { ACTIONS } from "../Actions";
-import {
-  useNavigate,
-  useLocation,
-  Navigate,
-  useParams,
-} from "react-router-dom";
+import { useNavigate, useLocation, Navigate, useParams } from "react-router-dom";
 import { toast } from "react-hot-toast";
 import axios from "axios";
 
@@ -38,7 +33,8 @@ function EditorPage() {
   const [isCompileWindowOpen, setIsCompileWindowOpen] = useState(false);
   const [isCompiling, setIsCompiling] = useState(false);
   const [selectedLanguage, setSelectedLanguage] = useState("python3");
-  const codeRef = useRef(null);
+  const [aiSuggestions, setAiSuggestions] = useState([]);
+  const codeRef = useRef("");
 
   const Location = useLocation();
   const navigate = useNavigate();
@@ -63,19 +59,16 @@ function EditorPage() {
         username: Location.state?.username,
       });
 
-      socketRef.current.on(
-        ACTIONS.JOINED,
-        ({ clients, username, socketId }) => {
-          if (username !== Location.state?.username) {
-            toast.success(`${username} joined the room.`);
-          }
-          setClients(clients);
-          socketRef.current.emit(ACTIONS.SYNC_CODE, {
-            code: codeRef.current,
-            socketId,
-          });
+      socketRef.current.on(ACTIONS.JOINED, ({ clients, username, socketId }) => {
+        if (username !== Location.state?.username) {
+          toast.success(`${username} joined the room.`);
         }
-      );
+        setClients(clients);
+        socketRef.current.emit(ACTIONS.SYNC_CODE, {
+          code: codeRef.current,
+          socketId,
+        });
+      });
 
       socketRef.current.on(ACTIONS.DISCONNECTED, ({ socketId, username }) => {
         toast.success(`${username} left the room`);
@@ -132,6 +125,29 @@ function EditorPage() {
     setIsCompileWindowOpen(!isCompileWindowOpen);
   };
 
+  const getAiSuggestions = async () => {
+    try {
+      const response = await axios.post("http://localhost:4000/suggest", {
+        code: codeRef.current,
+        language: selectedLanguage, // Include language if required by the backend
+      });
+  
+      console.log("AI Suggestions Response:", response.data); // Log the response
+  
+      // Check if the response contains suggestions
+      if (response.data && response.data.suggestions) {
+        setAiSuggestions(response.data.suggestions);
+      } else {
+        console.error("Unexpected response structure:", response.data);
+        setAiSuggestions([]); // Clear suggestions if structure is unexpected
+      }
+    } catch (error) {
+      console.error("Error fetching AI suggestions:", error);
+      setAiSuggestions([]); // Clear suggestions on error
+    }
+  };
+  
+
   return (
     <div className="container-fluid vh-100 d-flex flex-column">
       <div className="row flex-grow-1">
@@ -161,6 +177,9 @@ function EditorPage() {
             </button>
             <button className="btn btn-danger w-100" onClick={leaveRoom}>
               Leave Room
+            </button>
+            <button className="btn btn-info w-100 mb-2" onClick={getAiSuggestions}>
+              Get AI Suggestions
             </button>
           </div>
         </div>
@@ -235,6 +254,19 @@ function EditorPage() {
         <pre className="bg-secondary p-3 rounded">
           {output || "Output will appear here after compilation"}
         </pre>
+        {/* AI Suggestions */}
+        <div className="mt-3">
+          <h5>AI Suggestions:</h5>
+          {aiSuggestions.length > 0 ? (
+            <ul>
+              {aiSuggestions.map((suggestion, index) => (
+                <li key={index}>{suggestion}</li>
+              ))}
+            </ul>
+          ) : (
+            <p>No suggestions available</p> // Display a message when no suggestions
+          )}
+        </div>
       </div>
     </div>
   );
